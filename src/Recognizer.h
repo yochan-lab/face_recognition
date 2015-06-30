@@ -9,6 +9,7 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
+#include <std_msgs/Int16.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/contrib/contrib.hpp>
@@ -28,15 +29,12 @@ struct attempt {
 
 class Recognizer {
     ros::NodeHandle nh;
+    ros::Publisher face_pub;
     image_transport::ImageTransport it;
     image_transport::Subscriber image_source;
     string trainingData;
 
 private:
-    //FaceSorter db;
-    //attempt anAttempt;
-    //std::vector<cv::Mat> *images;
-    //std::vector<int> *labels;
     int isTrained;
     Ptr<cv::FaceRecognizer> model;
 

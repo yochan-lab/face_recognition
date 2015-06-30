@@ -9,6 +9,8 @@ Recognizer::Recognizer():it(nh) {
         ROS_ERROR("No training data file specified. Please set the 'training_file' parameter");
     image_source = it.subscribe("/face_finder/image_output", 1, &Recognizer::makePrediction, this);
 
+    face_pub = nh.advertise<std_msgs::Int16>("label_output", 20);
+
     model = createLBPHFaceRecognizer();
     isTrained = 1;
     try {
@@ -55,6 +57,10 @@ void Recognizer::makePrediction(const sensor_msgs::ImageConstPtr &msg) {
         newLabel.push_back(anAttempt.label);
         model->update(newImage, newLabel);
     }
+
+    std_msgs::Int16 label_msg;
+    label_msg.data = newLabel.back();
+    face_pub.publish(label_msg);
 
     model->save(trainingData);
 }
