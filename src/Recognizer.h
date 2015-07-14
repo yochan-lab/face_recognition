@@ -19,8 +19,7 @@ using namespace cv;
 struct attempt {
     double confidence;
     int label;
-    string name;
-    void data(double _label, int _confidence) {
+    void data(int _label, double _confidence) {
         this->label = _label;
         this->confidence = _confidence;
     }
@@ -37,6 +36,10 @@ class Recognizer {
 private:
     int isTrained;
     Ptr<cv::FaceRecognizer> model;
+    vector<cv::Mat> newImages;
+    vector<int> newLabels;
+    vector<double> newConfidence;
+    //double computeDeviation();
 
 public:
     Recognizer();

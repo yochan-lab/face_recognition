@@ -35,34 +35,57 @@ void Recognizer::makePrediction(const sensor_msgs::ImageConstPtr &msg) {
         return;
     }
 
-    vector<Mat> newImage; newImage.push_back(imageSample->image);
-    vector<int> newLabel;
+    newImages.push_back(imageSample->image); //add image for either training or updating
 
     if(isTrained == 0) {
-        newLabel.push_back(rand());
-        model->train(newImage,newLabel);
-	isTrained = 1;
-	return;
+        newLabels.push_back(rand()); //assign random ID for first person.
+        model->train(newImages,newLabels);
+        newImages.erase(newImages.begin(), newImages.end()); //erase any files, to prevent duplicate training.
+        newLabels.erase(newLabels.begin(), newLabels.end()); //I could just use pop_back, but I want to be sure...
+        newConfidence.erase(newConfidence.begin(), newConfidence.end());// this is probably unnecessary.
+	    isTrained = 1;
+	    return;
     }
 
-    attempt anAttempt;
-    anAttempt.data(-1, 0.0);0;
-    model->predict(imageSample->image, anAttempt.label, anAttempt.confidence); //this may not be correct
+    int resultLabel; double resultConfidence;
+    model->predict(imageSample->image, resultLabel, resultConfidence); //this may not be correct
+    newConfidence.push_back(resultConfidence);
 
-    if(anAttempt.label == -1 || anAttempt.confidence <= .1) { //we met a new person!
-        newLabel.push_back(rand());
-        model->update(newImage, newLabel);
+
+    if(newConfidence.size() > 10 && resultConfidence >= 60) { //if consistently above normal we met a new person!
+        int newID = rand();
+        newLabels.push_back(newID); //generate new ID
+
+        newImages.erase(newImages.begin(), newImages.begin()+4); //erase the first (usually deficient) data.
+        newLabels.erase(newLabels.begin(), newLabels.begin()+4);
+        newConfidence.erase(newConfidence.begin(), newConfidence.begin()+4);
+
+        for(int i=0; i<newLabels.size(); i++) //assign the new ID to the training data.
+            newLabels[i] = newID;
+
+        model->update(newImages, newLabels);
+	    ROS_INFO("new face: %i, P=%3.2f", newLabels.back(), resultConfidence);
+    }
+    else if(resultLabel == -1 || resultConfidence >= 60) { //if above normal, there may be a new person
+        newLabels.push_back(-1);
+        ROS_INFO("possible new face: P=%3.2f", resultConfidence);
+        return;
     }
     else { //we saw a familiar face
-        newLabel.push_back(anAttempt.label);
-        model->update(newImage, newLabel);
+        newLabels.push_back(resultLabel);
+        model->update(newImages, newLabels);
+        ROS_INFO("familiar face: %i, P=%3.2f", newLabels.back(), resultConfidence);
     }
 
     std_msgs::Int16 label_msg;
-    label_msg.data = newLabel.back();
+    label_msg.data = newLabels.back();
     face_pub.publish(label_msg);
 
     model->save(trainingData);
+
+    newImages.erase(newImages.begin(), newImages.end()); //erase any files, to prevent duplicate training.
+    newLabels.erase(newLabels.begin(), newLabels.end());
+    newConfidence.erase(newConfidence.begin(), newConfidence.end());
 }
 
 int main(int argc, char **argv) {
