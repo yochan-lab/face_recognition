@@ -5,11 +5,12 @@
 #include "Recognizer.h"
 
 Recognizer::Recognizer():it(nh) {
+    srand(time( NULL ));
     if(!ros::param::get("face_recognizer/training_file", trainingData))
         ROS_ERROR("No training data file specified. Please set the 'training_file' parameter");
     image_source = it.subscribe("/face_finder/image_output", 1, &Recognizer::makePrediction, this);
 
-    face_pub = nh.advertise<std_msgs::Int16>("label_output", 20);
+    face_pub = nh.advertise<std_msgs::Int32>("label_output", 1, false);
 
     model = createLBPHFaceRecognizer();
     isTrained = 1;
@@ -46,8 +47,9 @@ void Recognizer::makePrediction(const sensor_msgs::ImageConstPtr &msg) {
 	    isTrained = 1;
 	    return;
     }
-
+    ROS_INFO("processing face");
     int resultLabel; double resultConfidence;
+    //model->set("threshold", 55);
     model->predict(imageSample->image, resultLabel, resultConfidence); //this may not be correct
     newConfidence.push_back(resultConfidence);
 
@@ -56,9 +58,9 @@ void Recognizer::makePrediction(const sensor_msgs::ImageConstPtr &msg) {
         int newID = rand();
         newLabels.push_back(newID); //generate new ID
 
-        newImages.erase(newImages.begin(), newImages.begin()+4); //erase the first (usually deficient) data.
-        newLabels.erase(newLabels.begin(), newLabels.begin()+4);
-        newConfidence.erase(newConfidence.begin(), newConfidence.begin()+4);
+        newImages.erase(newImages.begin(), newImages.begin()+1); //erase the first (usually deficient) data.
+        newLabels.erase(newLabels.begin(), newLabels.begin()+1);
+        newConfidence.erase(newConfidence.begin(), newConfidence.begin()+1);
 
         for(int i=0; i<newLabels.size(); i++) //assign the new ID to the training data.
             newLabels[i] = newID;
@@ -67,7 +69,13 @@ void Recognizer::makePrediction(const sensor_msgs::ImageConstPtr &msg) {
 	    ROS_INFO("new face: %i, P=%3.2f", newLabels.back(), resultConfidence);
     }
     else if(resultLabel == -1 || resultConfidence >= 60) { //if above normal, there may be a new person
-        newLabels.push_back(-1);
+        //if (newConfidence.size() > 20) {
+	//    newImages.erase(newImages.begin(), newImages.end()-10);
+	//    newLabels.erase(newLabels.begin(), newLabels.end()-10);
+	//    newConfidence.erase(newConfidence.begin(), newConfidence.end()-10);
+	//}
+
+	newLabels.push_back(-1);
         ROS_INFO("possible new face: P=%3.2f", resultConfidence);
         return;
     }
@@ -77,7 +85,7 @@ void Recognizer::makePrediction(const sensor_msgs::ImageConstPtr &msg) {
         ROS_INFO("familiar face: %i, P=%3.2f", newLabels.back(), resultConfidence);
     }
 
-    std_msgs::Int16 label_msg;
+    std_msgs::Int32 label_msg;
     label_msg.data = newLabels.back();
     face_pub.publish(label_msg);
 
@@ -94,3 +102,4 @@ int main(int argc, char **argv) {
     ros::spin();
     return 0;
 }
+
